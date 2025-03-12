@@ -101,7 +101,7 @@ export class GitHubController {
           let executionTime: number | undefined;
 
           if (workflow) {
-            const startTime = workflow.startedAt;
+            const startTime = new Date(workflow_run.created_at);
             const endTime = new Date(workflow_run.updated_at);
             executionTime = Math.round(
               (endTime.getTime() - startTime.getTime()) / 1000
