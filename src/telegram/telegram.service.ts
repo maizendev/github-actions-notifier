@@ -271,9 +271,6 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     try {
       const message = `🚀 GitHub Action '${actionName}' запущен!\nRepository: ${repository}\nBranch: ${branch}`;
       await this.sendMessage(chatId, message);
-      console.log(
-        `Start notification sent for ${repository} (${actionName}) to chat ${chatId}`
-      );
     } catch (error) {
       console.error(
         `Failed to send start notification for ${repository}:`,
@@ -288,7 +285,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     repository: string,
     branch: string,
     conclusion: string,
-    actionName: string
+    actionName: string,
+    executionTimeSeconds?: number
   ): Promise<void> {
     try {
       const successEmoji = this.configService.get<string>(
@@ -307,17 +305,21 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       const emoji = conclusion === "success" ? successEmoji : errorEmoji;
       const status = conclusion === "success" ? "успешно" : "с ошибкой";
 
-      const message = messageTemplate
+      let message = messageTemplate
         .replace("{emoji}", emoji)
         .replace("{status}", status)
         .replace("{repository}", repository)
         .replace("{branch}", branch)
         .replace("{action}", actionName);
 
+      if (executionTimeSeconds !== undefined) {
+        const minutes = Math.floor(executionTimeSeconds / 60);
+        const seconds = executionTimeSeconds % 60;
+        const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+        message += `\nВремя выполнения: ${timeStr}`;
+      }
+
       await this.sendMessage(chatId, message);
-      console.log(
-        `Completion notification sent for ${repository} (${actionName}) to chat ${chatId}`
-      );
     } catch (error) {
       console.error(
         `Failed to send completion notification for ${repository}:`,
