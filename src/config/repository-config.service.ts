@@ -66,20 +66,18 @@ export class RepositoryConfigService {
       throw new Error("Repository already exists for this chat");
     }
 
+    const webhookSecret = this.configService.get<string>(
+      "GITHUB_WEBHOOK_SECRET"
+    );
+
     repositories.push({
       ...repo,
       actions: repo.actions || [],
       addedAt: new Date().toISOString(),
+      webhookSecret: webhookSecret,
     });
 
     this.saveRepositories(repositories);
-
-    const secret = crypto.randomBytes(32).toString("hex");
-    const secrets = JSON.parse(
-      this.configService.get<string>(this.WEBHOOK_SECRETS_KEY, "{}")
-    );
-    secrets[repo.name] = secret;
-    this.configService.set(this.WEBHOOK_SECRETS_KEY, JSON.stringify(secrets));
   }
 
   async removeRepository(repoName: string, chatId: string): Promise<void> {
