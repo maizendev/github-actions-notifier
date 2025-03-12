@@ -51,10 +51,16 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     try {
       console.log("Stopping Telegram bot...");
-      await this.bot.stop();
+      if (process.env.NODE_ENV === "production") {
+        await this.deleteWebhook();
+      } else {
+        await this.bot.stop();
+      }
       console.log("Telegram bot stopped successfully");
     } catch (e) {
-      console.error("Error stopping Telegram bot:", e);
+      if (e.message !== "Bot is not running!") {
+        console.error("Error stopping Telegram bot:", e);
+      }
     }
   }
 

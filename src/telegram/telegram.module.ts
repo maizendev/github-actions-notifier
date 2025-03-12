@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TelegramService } from "./telegram.service";
 import { TelegramController } from "./telegram.controller";
 import { RepositoryConfigModule } from "../config/repository-config.module";
@@ -11,8 +11,9 @@ import { Telegraf } from "telegraf";
   providers: [
     {
       provide: Telegraf,
-      useFactory: () => {
-        const token = process.env.TELEGRAM_BOT_TOKEN;
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const token = configService.get<string>("TELEGRAM_BOT_TOKEN");
         if (!token) {
           throw new Error("TELEGRAM_BOT_TOKEN is not defined");
         }
