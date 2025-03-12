@@ -143,6 +143,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.repositoryConfigService.addRepository({
         name: repoName,
         chatId: chatId.toString(),
+        actions: [],
         addedAt: new Date().toISOString(),
       });
 
