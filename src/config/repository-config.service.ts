@@ -12,6 +12,21 @@ export class RepositoryConfigService {
     if (!this.configService.get<string>(this.REPOSITORIES_KEY)) {
       this.configService.set(this.REPOSITORIES_KEY, "[]");
     }
+
+    const existingRepos = this.getRepositories();
+    if (
+      existingRepos.length > 0 &&
+      !this.configService.get<string>(this.WEBHOOK_SECRETS_KEY)
+    ) {
+      const secrets = {};
+      existingRepos.forEach((repo) => {
+        if (repo.webhookSecret) {
+          secrets[repo.name || repo.repository] = repo.webhookSecret;
+        }
+      });
+      this.configService.set(this.WEBHOOK_SECRETS_KEY, JSON.stringify(secrets));
+    }
+
     if (!this.configService.get<string>(this.WEBHOOK_SECRETS_KEY)) {
       this.configService.set(this.WEBHOOK_SECRETS_KEY, "{}");
     }
@@ -22,7 +37,17 @@ export class RepositoryConfigService {
       this.REPOSITORIES_KEY,
       "[]"
     );
-    return JSON.parse(reposJson);
+    const repos = JSON.parse(reposJson);
+
+    // Transform old format to new format if needed
+    return repos.map((repo) => ({
+      name: repo.name || repo.repository, // Prioritize name, fallback to repository
+      repository: repo.repository, // Keep original repository field
+      chatId: repo.chatId || JSON.parse(process.env.ADMIN_IDS || "[]")[0],
+      actions: repo.actions || [],
+      addedAt: repo.addedAt || new Date().toISOString(),
+      webhookSecret: repo.webhookSecret,
+    }));
   }
 
   private saveRepositories(repositories: RepositoryConfig[]): void {
