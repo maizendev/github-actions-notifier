@@ -33,6 +33,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         const webhookUrl = `${this.configService.get("APP_URL")}/telegram/webhook`;
         console.log(`Telegram webhook set to: ${webhookUrl}`);
       } else {
+        await this.deleteWebhook();
         await this.bot.launch({
           dropPendingUpdates: true,
         });
