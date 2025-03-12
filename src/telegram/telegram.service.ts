@@ -5,11 +5,11 @@ import { RepositoryConfigService } from "../config/repository-config.service";
 
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
-  private bot: Telegraf;
   private readonly ADMIN_IDS: number[];
 
   constructor(
-    private configService: ConfigService,
+    private readonly configService: ConfigService,
+    private readonly bot: Telegraf,
     private repositoryConfigService: RepositoryConfigService
   ) {
     const token = this.configService.get<string>("TELEGRAM_BOT_TOKEN");
@@ -17,8 +17,6 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (!token) {
       throw new Error("Telegram bot token is required");
     }
-
-    this.bot = new Telegraf(token);
 
     this.ADMIN_IDS = JSON.parse(
       this.configService.get<string>("ADMIN_IDS", "[]")
@@ -30,15 +28,25 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const externalUrl = this.configService.get<string>("RENDER_EXTERNAL_URL");
 
-      await this.bot.launch({
-        dropPendingUpdates: true,
-      });
+      if (process.env.NODE_ENV === "production") {
+        const webhookUrl = `${externalUrl}/telegram/webhook`;
+        await this.setWebhook(webhookUrl);
+        console.log(`Telegram webhook set to: ${webhookUrl}`);
+      } else {
+        await this.bot.launch({
+          dropPendingUpdates: true,
+        });
+        console.log("Telegram bot started in polling mode");
+      }
 
-      console.log("Telegram bot successfully started");
+      await this.setupCommands();
     } catch (error) {
-      console.error("Failed to start Telegram bot:", error);
+      console.error("Failed to initialize Telegram bot:", error);
+      if (process.env.NODE_ENV === "production") {
+        throw error;
+      }
     }
   }
 
@@ -285,6 +293,34 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         error
       );
       throw error;
+    }
+  }
+
+  async setWebhook(webhookUrl: string) {
+    try {
+      await this.bot.telegram.setWebhook(webhookUrl, {
+        drop_pending_updates: true,
+      });
+    } catch (error) {
+      console.error("Failed to set webhook:", error);
+      throw error;
+    }
+  }
+
+  async deleteWebhook() {
+    try {
+      await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+    } catch (error) {
+      console.error("Failed to delete webhook:", error);
+      throw error;
+    }
+  }
+
+  async handleUpdate(update: any) {
+    try {
+      await this.bot.handleUpdate(update);
+    } catch (error) {
+      console.error("Error handling update:", error);
     }
   }
 }
