@@ -12,8 +12,22 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  await app.listen(port);
-  console.log(`Application is running on: ${APP_URL}`);
-  console.log(`Server is running on port ${port}`);
+  try {
+    await app.listen(port);
+    console.log(`Application is running on: ${APP_URL}`);
+    console.log(`Server is running on port ${port}`);
+  } catch (error) {
+    console.error("Failed to start application:", error);
+    process.exit(1);
+  }
+
+  const signals = ["SIGTERM", "SIGINT"];
+  signals.forEach((signal) => {
+    process.on(signal, async () => {
+      console.log(`Received ${signal}, starting graceful shutdown...`);
+      await app.close();
+      process.exit(0);
+    });
+  });
 }
 bootstrap();

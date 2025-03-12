@@ -30,16 +30,15 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     try {
-      await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      process.once("SIGINT", () => this.bot.stop("SIGINT"));
-      process.once("SIGTERM", () => this.bot.stop("SIGTERM"));
+      await this.bot.launch({
+        dropPendingUpdates: true,
+      });
 
-      await this.bot.launch();
-      console.log("Telegram bot started successfully");
-    } catch (e) {
-      console.error("Failed to start Telegram bot:", e);
-      throw e;
+      console.log("Telegram bot successfully started");
+    } catch (error) {
+      console.error("Failed to start Telegram bot:", error);
     }
   }
 
