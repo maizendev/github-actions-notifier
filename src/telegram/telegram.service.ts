@@ -15,9 +15,9 @@ export class TelegramService {
     private appConfigService: AppConfigService,
     private repositoryConfigService: RepositoryConfigService
   ) {
-    const token = this.configService.get<string>("telegram.botToken");
+    const token = this.configService.get<string>("TELEGRAM_BOT_TOKEN");
+
     if (!token) {
-      console.error("Telegram bot token not found in configuration");
       throw new Error("Telegram bot token is required");
     }
 
