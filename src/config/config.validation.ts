@@ -1,10 +1,10 @@
 import { plainToClass } from "class-transformer";
-import { IsString, IsNotEmpty, validateSync } from "class-validator";
+import { IsString, IsNotEmpty, validateSync, IsArray } from "class-validator";
 
-class EnvironmentVariables {
+export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
-  "telegram.botToken": string;
+  TELEGRAM_BOT_TOKEN: string;
 
   @IsString()
   @IsNotEmpty()
