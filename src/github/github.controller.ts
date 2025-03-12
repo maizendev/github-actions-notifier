@@ -11,6 +11,17 @@ import { ConfigService } from "@nestjs/config";
 import { RepositoryConfigService } from "../config/repository-config.service";
 import * as crypto from "crypto";
 
+interface WorkflowRunPayload {
+  workflow_run: {
+    head_branch: string;
+    conclusion: string;
+    name: string;
+  };
+  repository: {
+    full_name: string;
+  };
+}
+
 @Controller("github")
 export class GitHubController {
   constructor(
@@ -23,12 +34,29 @@ export class GitHubController {
   async handleWebhook(
     @Headers("x-hub-signature-256") signature: string,
     @Headers("x-github-event") event: string,
+    @Headers("x-github-hook-id") hookId: string,
+    @Headers("x-github-delivery") delivery: string,
+    @Headers("user-agent") userAgent: string,
+    @Headers("x-github-hook-installation-target-type") targetType: string,
+    @Headers("x-github-hook-installation-target-id") targetId: string,
     @Body() payload: any
   ) {
-    // Проверка подписи
     if (!this.verifySignature(payload, signature)) {
       throw new HttpException("Invalid signature", HttpStatus.UNAUTHORIZED);
     }
+
+    if (!userAgent?.startsWith("GitHub-Hookshot/")) {
+      throw new HttpException("Invalid User-Agent", HttpStatus.UNAUTHORIZED);
+    }
+
+    console.log({
+      hookId,
+      delivery,
+      event,
+      targetType,
+      targetId,
+      repository: payload.repository?.full_name,
+    });
 
     if (event !== "workflow_run") {
       return { status: "ignored", event };
