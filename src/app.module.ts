@@ -4,6 +4,7 @@ import { TelegramModule } from "./telegram/telegram.module";
 import { AppConfigModule } from "./config/config.module";
 import { validate } from "./config/config.validation";
 import { RepositoryConfigModule } from "./config/repository-config.module";
+import { HealthModule } from "./health/health.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { RepositoryConfigModule } from "./config/repository-config.module";
     AppConfigModule,
     RepositoryConfigModule,
     TelegramModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
