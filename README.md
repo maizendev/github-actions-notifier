@@ -86,42 +86,42 @@ npm run start:prod
 
 ## Notification Format
 
-Telegram бот для уведомлений о завершении GitHub Actions.
+A Telegram bot for GitHub Actions completion notifications.
 
-## Настройка
+## Setup
 
-1. Клонируйте репозиторий
-2. Установите зависимости:
+1. Clone the repository
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. Создайте файл `.env` на основе `.env.example` и заполните необходимые переменные:
+3. Create `.env` file based on `.env.example` and fill in the required variables:
 
-- `TELEGRAM_BOT_TOKEN` - токен вашего Telegram бота (получить у @BotFather)
-- `TELEGRAM_CHAT_ID` - ID чата, куда будут приходить уведомления
+- `TELEGRAM_BOT_TOKEN` - your Telegram bot token (get from @BotFather)
+- `TELEGRAM_CHAT_ID` - chat ID where notifications will be sent
 
-## Настройка GitHub Webhook
+## GitHub Webhook Setup
 
-1. Перейдите в настройки вашего GitHub репозитория
-2. Выберите "Webhooks" -> "Add webhook"
-3. Укажите URL вашего сервера: `https://your-domain.com/github/webhook`
-4. Выберите тип контента: `application/json`
-5. Выберите события: `Workflow runs`
-6. Сохраните webhook
+1. Go to your GitHub repository settings
+2. Select "Webhooks" -> "Add webhook"
+3. Specify your server URL: `https://your-domain.com/github/webhook`
+4. Select content type: `application/json`
+5. Select events: `Workflow runs`
+6. Save webhook
 
-## Запуск
+## Running
 
 ```bash
-# Разработка
+# Development
 npm run start:dev
 
-# Продакшн
+# Production
 npm run build
 npm run start:prod
 ```
 
-## Использование
+## Usage
 
-После настройки webhook'а, бот будет автоматически отправлять уведомления в указанный Telegram чат при завершении GitHub Actions.
+After setting up the webhook, the bot will automatically send notifications to the specified Telegram chat when GitHub Actions complete.

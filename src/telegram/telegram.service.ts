@@ -54,12 +54,12 @@ export class TelegramService {
     const chatId = msg.chat.id;
     const isAdmin = this.ADMIN_IDS.includes(msg.from?.id || 0);
 
-    let message = "Привет! Я бот для уведомлений о GitHub Actions.\n\n";
+    let message = "Hello! I'm a bot for GitHub Actions notifications.\n\n";
     if (isAdmin) {
-      message += "Доступные команды:\n";
-      message += "/watch owner/repo - Начать отслеживание репозитория\n";
-      message += "/unwatch owner/repo - Прекратить отслеживание репозитория\n";
-      message += "/list - Показать список отслеживаемых репозиториев";
+      message += "Available commands:\n";
+      message += "/watch owner/repo - Start watching a repository\n";
+      message += "/unwatch owner/repo - Stop watching a repository\n";
+      message += "/list - Show list of watched repositories";
     }
 
     await this.sendMessage(chatId, message);
@@ -76,7 +76,7 @@ export class TelegramService {
       if (!this.isAdmin(userId)) {
         await this.sendMessage(
           chatId,
-          "У вас нет прав для выполнения этой команды."
+          "You don't have permission to execute this command."
         );
         console.warn(
           `Unauthorized watch attempt by user ${userId} in chat ${chatId}`
@@ -92,7 +92,7 @@ export class TelegramService {
       if (!this.isValidRepoName(repoName)) {
         await this.sendMessage(
           chatId,
-          "❌ Неверный формат названия репозитория. Используйте формат: owner/repository"
+          "❌ Invalid repository name format. Use format: owner/repository"
         );
         return;
       }
@@ -104,7 +104,7 @@ export class TelegramService {
       if (exists) {
         await this.sendMessage(
           chatId,
-          "❌ Этот репозиторий уже отслеживается в данном чате"
+          "❌ This repository is already being watched in this chat"
         );
         return;
       }
@@ -120,19 +120,19 @@ export class TelegramService {
 
       await this.sendMessage(
         chatId,
-        `✅ Теперь отслеживаю репозиторий ${repoName}\n\n` +
-          `⚠️ Настройка webhook в GitHub:\n` +
-          `1. Перейдите в Settings -> Webhooks\n` +
+        `✅ Now watching repository ${repoName}\n\n` +
+          `⚠️ GitHub webhook setup:\n` +
+          `1. Go to Settings -> Webhooks\n` +
           `2. Add webhook\n` +
           `3. Payload URL: ${this.configService.get("APP_URL")}/github/webhook\n` +
           `4. Content type: application/json\n` +
           `5. Secret: ${webhookSecret}\n` +
-          `6. В разделе "Which events would you like to trigger this webhook?"\n` +
-          `   выберите "Let me select individual events" → "Workflow runs"`
+          `6. In "Which events would you like to trigger this webhook?"\n` +
+          `   select "Let me select individual events" → "Workflow runs"`
       );
     } catch (error) {
       console.error(`Error in handleWatchRepo for chat ${chatId}:`, error);
-      await this.sendMessage(chatId, `❌ Ошибка: ${error.message}`);
+      await this.sendMessage(chatId, `❌ Error: ${error.message}`);
     }
   }
 
@@ -151,7 +151,7 @@ export class TelegramService {
       if (!this.isAdmin(userId)) {
         await this.sendMessage(
           chatId,
-          "У вас нет прав для выполнения этой команды."
+          "You don't have permission to execute this command."
         );
         console.warn(
           `Unauthorized unwatch attempt by user ${userId} in chat ${chatId}`
@@ -163,7 +163,7 @@ export class TelegramService {
       if (!this.isValidRepoName(repoName)) {
         await this.sendMessage(
           chatId,
-          "❌ Неверный формат названия репозитория. Используйте формат: owner/repository"
+          "❌ Invalid repository name format. Use format: owner/repository"
         );
         return;
       }
@@ -175,7 +175,7 @@ export class TelegramService {
       if (!exists) {
         await this.sendMessage(
           chatId,
-          "❌ Этот репозиторий не отслеживается в данном чате"
+          "❌ This repository is not being watched in this chat"
         );
         return;
       }
@@ -188,11 +188,11 @@ export class TelegramService {
       console.log(`Repository ${repoName} unwatched in chat ${chatId}`);
       await this.sendMessage(
         chatId,
-        `✅ Репозиторий ${repoName} больше не отслеживается!`
+        `✅ Repository ${repoName} is no longer being watched!`
       );
     } catch (error) {
       console.error(`Error in handleUnwatchRepo for chat ${chatId}:`, error);
-      await this.sendMessage(chatId, `❌ Ошибка: ${error.message}`);
+      await this.sendMessage(chatId, `❌ Error: ${error.message}`);
     }
   }
 
@@ -200,7 +200,7 @@ export class TelegramService {
     if (!this.isAdmin(msg.from?.id)) {
       await this.sendMessage(
         msg.chat.id,
-        "У вас нет прав для выполнения этой команды."
+        "You don't have permission to execute this command."
       );
       return;
     }
@@ -212,21 +212,24 @@ export class TelegramService {
         );
 
       if (repositories.length === 0) {
-        await this.sendMessage(msg.chat.id, "Нет отслеживаемых репозиториев.");
+        await this.sendMessage(
+          msg.chat.id,
+          "No repositories are being watched."
+        );
         return;
       }
 
       const message = repositories
         .map(
           (repo) =>
-            `📦 ${repo.name}\n   Чат: ${repo.chatId}\n   Actions: ${repo.actions?.join(", ") || "все"}\n   Добавлен: ${repo.addedAt}`
+            `📦 ${repo.name}\n   Chat: ${repo.chatId}\n   Actions: ${repo.actions?.join(", ") || "all"}\n   Added: ${repo.addedAt}`
         )
         .join("\n\n");
 
       await this.sendMessage(msg.chat.id, message);
     } catch (error) {
       console.error(`Error in handleListRepos for chat ${msg.chat.id}:`, error);
-      await this.sendMessage(msg.chat.id, `❌ Ошибка: ${error.message}`);
+      await this.sendMessage(msg.chat.id, `❌ Error: ${error.message}`);
     }
   }
 
@@ -261,11 +264,11 @@ export class TelegramService {
       );
       const messageTemplate = this.configService.get<string>(
         "TELEGRAM_MESSAGE_TEMPLATE",
-        "{emoji} GitHub Action '{action}' завершен {status}!\nRepository: {repository}\nBranch: {branch}"
+        "{emoji} GitHub Action '{action}' completed {status}!\nRepository: {repository}\nBranch: {branch}"
       );
 
       const emoji = conclusion === "success" ? successEmoji : errorEmoji;
-      const status = conclusion === "success" ? "успешно" : "с ошибкой";
+      const status = conclusion === "success" ? "successfully" : "with error";
 
       const message = messageTemplate
         .replace("{emoji}", emoji)
