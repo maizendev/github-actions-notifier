@@ -5,6 +5,7 @@ import { AppConfigModule } from "./config/config.module";
 import { validate } from "./config/config.validation";
 import { RepositoryConfigModule } from "./config/repository-config.module";
 import { HealthModule } from "./health/health.module";
+import { GitHubModule } from "./github/github.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { HealthModule } from "./health/health.module";
     RepositoryConfigModule,
     TelegramModule,
     HealthModule,
+    GitHubModule,
   ],
 })
 export class AppModule {}
