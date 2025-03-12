@@ -8,8 +8,12 @@ async function bootstrap() {
   const port = configService.get("PORT", 3000);
   const APP_URL = configService.get("APP_URL", "http://localhost:3000");
 
-  // Graceful shutdown
+  app.enableCors();
+
   app.enableShutdownHooks();
-  
+
   await app.listen(port);
-  console.log(`
+  console.log(`Application is running on: ${APP_URL}`);
+  console.log(`Server is running on port ${port}`);
+}
+bootstrap();
