@@ -28,11 +28,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     try {
-      const externalUrl = this.configService.get<string>("RENDER_EXTERNAL_URL");
-
       if (process.env.NODE_ENV === "production") {
-        const webhookUrl = `${externalUrl}/telegram/webhook`;
-        await this.setWebhook(webhookUrl);
+        await this.setWebhook();
+        const webhookUrl = `${this.configService.get("APP_URL")}/telegram/webhook`;
         console.log(`Telegram webhook set to: ${webhookUrl}`);
       } else {
         await this.bot.launch({
@@ -296,15 +294,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async setWebhook(webhookUrl: string) {
-    try {
-      await this.bot.telegram.setWebhook(webhookUrl, {
-        drop_pending_updates: true,
-      });
-    } catch (error) {
-      console.error("Failed to set webhook:", error);
-      throw error;
-    }
+  async setWebhook() {
+    const webhookUrl = `${this.configService.get("APP_URL")}/telegram/webhook`;
+    return this.bot.telegram.setWebhook(webhookUrl, {
+      drop_pending_updates: true,
+    });
   }
 
   async deleteWebhook() {

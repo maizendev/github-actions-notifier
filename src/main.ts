@@ -1,6 +1,7 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ConfigService } from "@nestjs/config";
+import { TelegramService } from "./telegram/telegram.service";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -18,9 +19,30 @@ async function bootstrap() {
     await app.init();
 
     if (process.env.NODE_ENV === "production") {
-      const telegramService = app.get("TelegramService");
-      await telegramService.setWebhook(`${APP_URL}/telegram/webhook`);
-      console.log("Telegram webhook configured successfully");
+      const telegramService = app.get(TelegramService);
+
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          await telegramService.setWebhook();
+          console.log("Telegram webhook configured successfully");
+          break;
+        } catch (error) {
+          if (
+            error?.response?.error_code === 429 &&
+            error?.response?.parameters?.retry_after
+          ) {
+            const retryAfter = error.response.parameters.retry_after * 1000;
+            console.log(
+              `Rate limited, waiting ${retryAfter}ms before retry...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, retryAfter));
+            retries--;
+          } else {
+            throw error;
+          }
+        }
+      }
     }
 
     await app.listen(port);
@@ -37,7 +59,7 @@ async function bootstrap() {
       console.log(`Received ${signal}, starting graceful shutdown...`);
       try {
         if (process.env.NODE_ENV === "production") {
-          const telegramService = app.get("TelegramService");
+          const telegramService = app.get(TelegramService);
           await telegramService.deleteWebhook();
           console.log("Telegram webhook removed successfully");
         }

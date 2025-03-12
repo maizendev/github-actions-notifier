@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { TelegramModule } from "./telegram/telegram.module";
 import { AppConfigModule } from "./config/config.module";
 import { validate } from "./config/config.validation";
+import { RepositoryConfigModule } from "./config/repository-config.module";
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { validate } from "./config/config.validation";
       validate,
     }),
     AppConfigModule,
+    RepositoryConfigModule,
     TelegramModule,
   ],
 })
