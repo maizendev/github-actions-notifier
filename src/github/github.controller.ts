@@ -16,6 +16,7 @@ interface WorkflowRunPayload {
     head_branch: string;
     conclusion: string;
     name: string;
+    status: string;
   };
   repository: {
     full_name: string;
@@ -30,6 +31,10 @@ export class GitHubController {
     private readonly repositoryConfigService: RepositoryConfigService
   ) {}
 
+  private getTimestamp(): string {
+    return new Date().toISOString();
+  }
+
   @Post("webhook")
   async handleWebhook(
     @Headers("x-hub-signature-256") signature: string,
@@ -41,6 +46,10 @@ export class GitHubController {
     @Headers("x-github-hook-installation-target-id") targetId: string,
     @Body() payload: any
   ) {
+    console.log(
+      "\n==> 🟢 START WEBHOOK PROCESSING [" + this.getTimestamp() + "] 🟢"
+    );
+    console.log("==> Delivery ID:", delivery);
     console.log("==> Webhook received with headers:", {
       signature,
       event,
@@ -51,77 +60,129 @@ export class GitHubController {
       targetId,
     });
 
-    console.log("==> Webhook payload:", JSON.stringify(payload, null, 2));
+    try {
+      console.log("==> Webhook payload:", JSON.stringify(payload, null, 2));
 
-    if (!this.verifySignature(payload, signature)) {
-      console.error("==> Invalid signature detected");
-      console.log(
-        "==> Expected signature:",
-        this.calculateExpectedSignature(payload)
-      );
-      console.log("==> Received signature:", signature);
-      throw new HttpException("Invalid signature", HttpStatus.UNAUTHORIZED);
-    }
-
-    console.log("==> Signature verified successfully");
-
-    if (!userAgent?.startsWith("GitHub-Hookshot/")) {
-      console.error("==> Invalid User-Agent:", userAgent);
-      throw new HttpException("Invalid User-Agent", HttpStatus.UNAUTHORIZED);
-    }
-
-    console.log({
-      hookId,
-      delivery,
-      event,
-      targetType,
-      targetId,
-      repository: payload.repository?.full_name,
-    });
-
-    if (event !== "workflow_run") {
-      console.log("==> Ignoring non-workflow_run event:", event);
-      return { status: "ignored", event };
-    }
-
-    console.log("==> Processing workflow_run event");
-
-    const { workflow_run, repository } = payload;
-    const repositories =
-      await this.repositoryConfigService.getAllRepositories();
-
-    console.log("==> Found repositories config:", repositories);
-
-    // Отправляем уведомления во все чаты, которые следят за этим репозиторием
-    const repoConfigs = repositories.filter(
-      (repo) => repo.name === repository.full_name
-    );
-
-    console.log("==> Matching repository configs:", repoConfigs);
-
-    for (const repoConfig of repoConfigs) {
-      try {
-        console.log("==> Sending notification to chat:", repoConfig.chatId);
-        await this.telegramService.sendActionCompleteNotification(
-          repoConfig.chatId,
-          repository.full_name,
-          workflow_run.head_branch,
-          workflow_run.conclusion,
-          workflow_run.name
-        );
+      if (!this.verifySignature(payload, signature)) {
+        console.error("==> ❌ Invalid signature detected");
         console.log(
-          "==> Notification sent successfully to chat:",
-          repoConfig.chatId
+          "==> Expected signature:",
+          this.calculateExpectedSignature(payload)
         );
-      } catch (error) {
-        console.error(
-          `==> Failed to send notification to chat ${repoConfig.chatId}:`,
-          error
-        );
+        console.log("==> Received signature:", signature);
+        throw new HttpException("Invalid signature", HttpStatus.UNAUTHORIZED);
       }
-    }
 
-    return { status: "success" };
+      console.log("==> ✅ Signature verified successfully");
+
+      if (!userAgent?.startsWith("GitHub-Hookshot/")) {
+        console.error("==> ❌ Invalid User-Agent:", userAgent);
+        throw new HttpException("Invalid User-Agent", HttpStatus.UNAUTHORIZED);
+      }
+
+      console.log("==> 📝 Processing webhook data:", {
+        hookId,
+        delivery,
+        event,
+        targetType,
+        targetId,
+        repository: payload.repository?.full_name,
+      });
+
+      if (event !== "workflow_run") {
+        console.log("==> ⏭️ Ignoring non-workflow_run event:", event);
+        console.log(
+          "==> 🔴 END WEBHOOK PROCESSING [" +
+            this.getTimestamp() +
+            "] - Ignored 🔴\n"
+        );
+        return { status: "ignored", event };
+      }
+
+      console.log("==> ⚡ Processing workflow_run event");
+
+      const { workflow_run, repository } = payload;
+      const repositories =
+        await this.repositoryConfigService.getAllRepositories();
+
+      console.log("==> 📋 Found repositories config:", repositories);
+
+      const repoConfigs = repositories.filter(
+        (repo) => repo.name === repository.full_name
+      );
+
+      console.log("==> 🎯 Matching repository configs:", repoConfigs);
+
+      // Отправляем уведомления о начале процесса
+      if (workflow_run.status === "in_progress") {
+        for (const repoConfig of repoConfigs) {
+          try {
+            console.log(
+              "==> 📤 Sending start notification to chat:",
+              repoConfig.chatId
+            );
+            await this.telegramService.sendActionStartNotification(
+              repoConfig.chatId,
+              repository.full_name,
+              workflow_run.head_branch,
+              workflow_run.name
+            );
+            console.log(
+              "==> ✅ Start notification sent successfully to chat:",
+              repoConfig.chatId
+            );
+          } catch (error) {
+            console.error(
+              `==> ❌ Failed to send start notification to chat ${repoConfig.chatId}:`,
+              error
+            );
+          }
+        }
+      }
+
+      // Отправляем уведомления о завершении процесса
+      if (workflow_run.status === "completed") {
+        for (const repoConfig of repoConfigs) {
+          try {
+            console.log(
+              "==> 📤 Sending completion notification to chat:",
+              repoConfig.chatId
+            );
+            await this.telegramService.sendActionCompleteNotification(
+              repoConfig.chatId,
+              repository.full_name,
+              workflow_run.head_branch,
+              workflow_run.conclusion,
+              workflow_run.name
+            );
+            console.log(
+              "==> ✅ Completion notification sent successfully to chat:",
+              repoConfig.chatId
+            );
+          } catch (error) {
+            console.error(
+              `==> ❌ Failed to send completion notification to chat ${repoConfig.chatId}:`,
+              error
+            );
+          }
+        }
+      }
+
+      console.log(
+        "==> 🔴 END WEBHOOK PROCESSING [" +
+          this.getTimestamp() +
+          "] - Success 🔴\n"
+      );
+      return { status: "success" };
+    } catch (error) {
+      console.error("==> ❌ Error processing webhook:", error);
+      console.log(
+        "==> 🔴 END WEBHOOK PROCESSING [" +
+          this.getTimestamp() +
+          "] - Error 🔴\n"
+      );
+      throw error;
+    }
   }
 
   private verifySignature(payload: any, signature: string): boolean {

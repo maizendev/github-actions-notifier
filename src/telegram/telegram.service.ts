@@ -6,22 +6,26 @@ import { RepositoryConfigService } from "../config/repository-config.service";
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly ADMIN_IDS: number[];
+  private readonly bot: Telegraf;
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly bot: Telegraf,
-    private repositoryConfigService: RepositoryConfigService
+    private readonly repositoryConfigService: RepositoryConfigService
   ) {
     const token = this.configService.get<string>("TELEGRAM_BOT_TOKEN");
-
     if (!token) {
-      throw new Error("Telegram bot token is required");
+      throw new Error("TELEGRAM_BOT_TOKEN must be provided");
     }
+    this.bot = new Telegraf(token);
 
-    this.ADMIN_IDS = JSON.parse(
-      this.configService.get<string>("ADMIN_IDS", "[]")
-    );
-    console.log(`Configured admin IDs: ${this.ADMIN_IDS.join(", ")}`);
+    const adminIds = this.configService.get<string>("ADMIN_IDS");
+    try {
+      this.ADMIN_IDS = JSON.parse(adminIds);
+      console.log("Configured admin IDs:", this.ADMIN_IDS.join(", "));
+    } catch (error) {
+      console.error("Failed to parse ADMIN_IDS:", error);
+      this.ADMIN_IDS = [];
+    }
 
     this.setupCommands();
   }
@@ -258,6 +262,27 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async sendActionStartNotification(
+    chatId: number,
+    repository: string,
+    branch: string,
+    actionName: string
+  ): Promise<void> {
+    try {
+      const message = `🚀 GitHub Action '${actionName}' запущен!\nRepository: ${repository}\nBranch: ${branch}`;
+      await this.sendMessage(chatId, message);
+      console.log(
+        `Start notification sent for ${repository} (${actionName}) to chat ${chatId}`
+      );
+    } catch (error) {
+      console.error(
+        `Failed to send start notification for ${repository}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
   async sendActionCompleteNotification(
     chatId: number,
     repository: string,
@@ -276,11 +301,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       );
       const messageTemplate = this.configService.get<string>(
         "TELEGRAM_MESSAGE_TEMPLATE",
-        "{emoji} GitHub Action '{action}' completed {status}!\nRepository: {repository}\nBranch: {branch}"
+        "{emoji} GitHub Action '{action}' завершен {status}!\nRepository: {repository}\nBranch: {branch}"
       );
 
       const emoji = conclusion === "success" ? successEmoji : errorEmoji;
-      const status = conclusion === "success" ? "successfully" : "with error";
+      const status = conclusion === "success" ? "успешно" : "с ошибкой";
 
       const message = messageTemplate
         .replace("{emoji}", emoji)
@@ -291,11 +316,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
       await this.sendMessage(chatId, message);
       console.log(
-        `Notification sent for ${repository} (${actionName}) to chat ${chatId}`
+        `Completion notification sent for ${repository} (${actionName}) to chat ${chatId}`
       );
     } catch (error) {
       console.error(
-        `Failed to send action notification for ${repository}:`,
+        `Failed to send completion notification for ${repository}:`,
         error
       );
       throw error;
