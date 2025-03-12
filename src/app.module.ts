@@ -6,12 +6,16 @@ import { validate } from "./config/config.validation";
 import { RepositoryConfigModule } from "./config/repository-config.module";
 import { HealthModule } from "./health/health.module";
 import { GitHubModule } from "./github/github.module";
+import configuration from "./config/configuration";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       validate,
+      load: [configuration],
+      cache: true,
+      expandVariables: true,
     }),
     AppConfigModule,
     RepositoryConfigModule,
