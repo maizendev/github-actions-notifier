@@ -16,11 +16,20 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   try {
+    if (process.env.NODE_ENV === "production") {
+      const telegramService = app.get(TelegramService);
+      try {
+        await telegramService.deleteWebhook();
+        console.log("Cleaned up existing webhook configuration");
+      } catch (error) {
+        console.warn("Failed to cleanup existing webhook:", error.message);
+      }
+    }
+
     await app.init();
 
     if (process.env.NODE_ENV === "production") {
       const telegramService = app.get(TelegramService);
-
       let retries = 3;
       while (retries > 0) {
         try {
@@ -28,6 +37,14 @@ async function bootstrap() {
           console.log("Telegram webhook configured successfully");
           break;
         } catch (error) {
+          if (error?.response?.error_code === 409) {
+            console.log(
+              "Detected conflicting bot instance, retrying after cleanup..."
+            );
+            await telegramService.deleteWebhook();
+            retries--;
+            continue;
+          }
           if (
             error?.response?.error_code === 429 &&
             error?.response?.parameters?.retry_after
