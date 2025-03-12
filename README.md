@@ -86,42 +86,18 @@ npm run start:prod
 
 ## Notification Format
 
-A Telegram bot for GitHub Actions completion notifications.
+The bot sends formatted messages for GitHub Actions events. The default format is:
 
-## Setup
-
-1. Clone the repository
-2. Install dependencies:
-
-```bash
-npm install
+```
+✅ GitHub Action 'workflow_name' completed successfully!
+Repository: owner/repo
+Branch: main
 ```
 
-3. Create `.env` file based on `.env.example` and fill in the required variables:
+You can customize this format using the `TELEGRAM_MESSAGE_TEMPLATE` variable in your `.env` file. Available placeholders:
 
-- `TELEGRAM_BOT_TOKEN` - your Telegram bot token (get from @BotFather)
-- `TELEGRAM_CHAT_ID` - chat ID where notifications will be sent
-
-## GitHub Webhook Setup
-
-1. Go to your GitHub repository settings
-2. Select "Webhooks" -> "Add webhook"
-3. Specify your server URL: `https://your-domain.com/github/webhook`
-4. Select content type: `application/json`
-5. Select events: `Workflow runs`
-6. Save webhook
-
-## Running
-
-```bash
-# Development
-npm run start:dev
-
-# Production
-npm run build
-npm run start:prod
-```
-
-## Usage
-
-After setting up the webhook, the bot will automatically send notifications to the specified Telegram chat when GitHub Actions complete.
+- `{emoji}` - Success (✅) or error (❌) emoji
+- `{action}` - The name of the GitHub Action workflow
+- `{status}` - Completion status ("successfully" or "with error")
+- `{repository}` - Repository name in owner/repo format
+- `{branch}` - Branch name where the action was triggered
