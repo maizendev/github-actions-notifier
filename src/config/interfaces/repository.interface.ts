@@ -1,7 +1,7 @@
 export interface RepositoryConfig {
   name: string;
   repository?: string; // For backward compatibility
-  chatId: string;
+  chatId: number;
   actions: string[];
   addedAt: string;
   webhookSecret?: string;

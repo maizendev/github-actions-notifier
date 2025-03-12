@@ -43,7 +43,9 @@ export class RepositoryConfigService {
     return repos.map((repo) => ({
       name: repo.name || repo.repository, // Prioritize name, fallback to repository
       repository: repo.repository, // Keep original repository field
-      chatId: repo.chatId || JSON.parse(process.env.ADMIN_IDS || "[]")[0],
+      chatId:
+        Number(repo.chatId) ||
+        Number(JSON.parse(process.env.ADMIN_IDS || "[]")[0]),
       actions: repo.actions || [],
       addedAt: repo.addedAt || new Date().toISOString(),
       webhookSecret: repo.webhookSecret,
@@ -84,7 +86,7 @@ export class RepositoryConfigService {
     const repositories = this.getRepositories();
 
     const filteredRepos = repositories.filter(
-      (repo) => !(repo.name === repoName && repo.chatId === chatId)
+      (repo) => !(repo.name === repoName && repo.chatId === Number(chatId))
     );
 
     if (filteredRepos.length === repositories.length) {
@@ -107,14 +109,18 @@ export class RepositoryConfigService {
 
   async getRepositoriesForChat(chatId: string): Promise<RepositoryConfig[]> {
     const repositories = this.getRepositories();
-    return repositories.filter((repo) => repo.chatId === chatId);
+    return repositories.filter((repo) => repo.chatId === Number(chatId));
   }
 
   async repositoryExists(repoName: string, chatId: string): Promise<boolean> {
     const repositories = this.getRepositories();
     return repositories.some(
-      (repo) => repo.name === repoName && repo.chatId === chatId
+      (repo) => repo.name === repoName && repo.chatId === Number(chatId)
     );
+  }
+
+  async getAllRepositories(): Promise<RepositoryConfig[]> {
+    return this.getRepositories();
   }
 
   async getWebhookSecret(repoName: string): Promise<string> {

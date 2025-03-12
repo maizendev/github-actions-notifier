@@ -8,13 +8,15 @@ import {
 } from "@nestjs/common";
 import { TelegramService } from "../telegram/telegram.service";
 import { ConfigService } from "@nestjs/config";
+import { RepositoryConfigService } from "../config/repository-config.service";
 import * as crypto from "crypto";
 
 @Controller("github")
 export class GitHubController {
   constructor(
     private readonly telegramService: TelegramService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly repositoryConfigService: RepositoryConfigService
   ) {}
 
   @Post("webhook")
@@ -33,15 +35,30 @@ export class GitHubController {
     }
 
     const { workflow_run, repository } = payload;
+    const repositories =
+      await this.repositoryConfigService.getAllRepositories();
 
-    // Отправка уведомления через Telegram
-    await this.telegramService.sendActionCompleteNotification(
-      Number(process.env.ADMIN_IDS[0]), // или получите chatId из конфигурации
-      repository.full_name,
-      workflow_run.head_branch,
-      workflow_run.conclusion,
-      workflow_run.name
+    // Отправляем уведомления во все чаты, которые следят за этим репозиторием
+    const repoConfigs = repositories.filter(
+      (repo) => repo.name === repository.full_name
     );
+
+    for (const repoConfig of repoConfigs) {
+      try {
+        await this.telegramService.sendActionCompleteNotification(
+          repoConfig.chatId, // chatId уже преобразован в число в getRepositories
+          repository.full_name,
+          workflow_run.head_branch,
+          workflow_run.conclusion,
+          workflow_run.name
+        );
+      } catch (error) {
+        console.error(
+          `Failed to send notification to chat ${repoConfig.chatId}:`,
+          error
+        );
+      }
+    }
 
     return { status: "success" };
   }
