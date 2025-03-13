@@ -1,24 +1,33 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Telegraf, Context } from "telegraf";
-import * as TelegramBot from "node-telegram-bot-api";
+import TelegramBot from "node-telegram-bot-api";
 import { RepositoryConfigService } from "../config/repository-config.service";
+import { UsersService } from "../users/users.service";
+import { UserRole } from "../entities/user.entity";
+import { Message } from "telegraf/typings/core/types/typegram";
 
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
+  private readonly OWNER_ID: number;
   private readonly ADMIN_IDS: number[];
   private readonly bot: Telegraf;
   private readonly telegramBot: TelegramBot;
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly repositoryConfigService: RepositoryConfigService
+    private readonly repositoryConfigService: RepositoryConfigService,
+    private readonly usersService: UsersService
   ) {
     const token = this.configService.get<string>("TELEGRAM_BOT_TOKEN");
     if (!token) {
       throw new Error("TELEGRAM_BOT_TOKEN must be provided");
     }
-    this.bot = new Telegraf(token);
+
+    this.OWNER_ID = parseInt(
+      this.configService.get<string>("OWNER") || "505866066",
+      10
+    );
 
     const adminIds = this.configService.get<string>("ADMIN_IDS");
     try {
@@ -29,8 +38,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       this.ADMIN_IDS = [];
     }
 
-    this.setupCommands();
-
+    this.bot = new Telegraf(token);
     this.telegramBot = new TelegramBot(token, {
       polling: process.env.NODE_ENV !== "production",
     });
@@ -75,24 +83,75 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async getUserRole(userId: number): Promise<UserRole> {
+    if (userId === this.OWNER_ID) {
+      return UserRole.OWNER;
+    }
+    if (this.ADMIN_IDS.includes(userId)) {
+      return UserRole.ADMIN;
+    }
+    return UserRole.USER;
+  }
+
+  private async checkPermission(
+    userId: number,
+    requiredRole: UserRole
+  ): Promise<boolean> {
+    const userRole = await this.getUserRole(userId);
+
+    switch (requiredRole) {
+      case UserRole.OWNER:
+        return userRole === UserRole.OWNER;
+      case UserRole.ADMIN:
+        return userRole === UserRole.OWNER || userRole === UserRole.ADMIN;
+      case UserRole.USER:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   private setupCommands() {
     try {
       this.bot.command("start", (ctx) => this.handleStart(ctx));
-      this.bot.command("watch", (ctx) => {
-        const args = ctx.message.text.split(" ").slice(1);
-        if (args.length > 0) {
-          this.handleWatchRepo(ctx, args[0]);
-        } else {
-          ctx.reply("Please specify repository name: /watch owner/repo");
+
+      // Owner commands
+      this.bot.command("addadmin", async (ctx) => {
+        if ("text" in ctx.message) {
+          await this.handleAddAdmin(ctx);
         }
       });
 
-      this.bot.command("unwatch", (ctx) => {
-        const args = ctx.message.text.split(" ").slice(1);
-        if (args.length > 0) {
-          this.handleUnwatchRepo(ctx, args[0]);
-        } else {
-          ctx.reply("Please specify repository name: /unwatch owner/repo");
+      this.bot.command("removeadmin", async (ctx) => {
+        if ("text" in ctx.message) {
+          await this.handleRemoveAdmin(ctx);
+        }
+      });
+
+      // Admin commands
+      this.bot.command("watch", async (ctx) => {
+        if ("text" in ctx.message) {
+          const args = ctx.message.text.split(" ").slice(1);
+          if (args.length > 0) {
+            await this.handleWatchRepo(ctx, args[0]);
+          } else {
+            await ctx.reply(
+              "Please specify repository name: /watch owner/repo"
+            );
+          }
+        }
+      });
+
+      this.bot.command("unwatch", async (ctx) => {
+        if ("text" in ctx.message) {
+          const args = ctx.message.text.split(" ").slice(1);
+          if (args.length > 0) {
+            await this.handleUnwatchRepo(ctx, args[0]);
+          } else {
+            await ctx.reply(
+              "Please specify repository name: /unwatch owner/repo"
+            );
+          }
         }
       });
 
@@ -102,6 +161,60 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       console.error("Failed to setup bot commands:", error);
       throw error;
+    }
+  }
+
+  private async handleAddAdmin(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.OWNER))) {
+      await ctx.reply("❌ Only the owner can add administrators");
+      return;
+    }
+
+    if (!("text" in ctx.message)) {
+      await ctx.reply("❌ Invalid command format");
+      return;
+    }
+
+    const args = ctx.message.text.split(" ").slice(1);
+    if (args.length === 0) {
+      await ctx.reply("Please specify Telegram ID: /addadmin <telegram_id>");
+      return;
+    }
+
+    const newAdminId = args[0];
+    try {
+      await this.usersService.updateUserRole(newAdminId, UserRole.ADMIN);
+      await ctx.reply(`✅ User ${newAdminId} has been added as administrator`);
+    } catch (error) {
+      await ctx.reply(`❌ Failed to add administrator: ${error.message}`);
+    }
+  }
+
+  private async handleRemoveAdmin(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.OWNER))) {
+      await ctx.reply("❌ Only the owner can remove administrators");
+      return;
+    }
+
+    if (!("text" in ctx.message)) {
+      await ctx.reply("❌ Invalid command format");
+      return;
+    }
+
+    const args = ctx.message.text.split(" ").slice(1);
+    if (args.length === 0) {
+      await ctx.reply("Please specify Telegram ID: /removeadmin <telegram_id>");
+      return;
+    }
+
+    const adminId = args[0];
+    try {
+      await this.usersService.updateUserRole(adminId, UserRole.USER);
+      await ctx.reply(`✅ Administrator ${adminId} has been removed`);
+    } catch (error) {
+      await ctx.reply(`❌ Failed to remove administrator: ${error.message}`);
     }
   }
 
@@ -121,18 +234,15 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleWatchRepo(ctx: Context, repoName: string) {
-    const chatId = ctx.chat.id;
     const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.ADMIN))) {
+      await ctx.reply("❌ Only administrators can watch repositories");
+      return;
+    }
+
+    const chatId = ctx.chat.id;
 
     try {
-      if (!this.isAdmin(userId)) {
-        await ctx.reply("You don't have permission to execute this command.");
-        console.warn(
-          `Unauthorized watch attempt by user ${userId} in chat ${chatId}`
-        );
-        return;
-      }
-
       if (!this.isValidRepoName(repoName)) {
         await ctx.reply(
           "❌ Invalid repository name format. Use format: owner/repository"
@@ -183,18 +293,15 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleUnwatchRepo(ctx: Context, repoName: string) {
-    const chatId = ctx.chat.id;
     const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.ADMIN))) {
+      await ctx.reply("❌ Only administrators can unwatch repositories");
+      return;
+    }
+
+    const chatId = ctx.chat.id;
 
     try {
-      if (!this.isAdmin(userId)) {
-        await ctx.reply("You don't have permission to execute this command.");
-        console.warn(
-          `Unauthorized unwatch attempt by user ${userId} in chat ${chatId}`
-        );
-        return;
-      }
-
       if (!this.isValidRepoName(repoName)) {
         await ctx.reply(
           "❌ Invalid repository name format. Use format: owner/repository"
@@ -225,8 +332,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleListRepos(ctx: Context) {
-    if (!this.isAdmin(ctx.from?.id)) {
-      await ctx.reply("You don't have permission to execute this command.");
+    const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.ADMIN))) {
+      await ctx.reply("❌ Only administrators can list repositories");
       return;
     }
 
@@ -253,10 +361,6 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       console.error(`Error in handleListRepos for chat ${ctx.chat.id}:`, error);
       await ctx.reply(`❌ Error: ${error.message}`);
     }
-  }
-
-  private isAdmin(userId?: number): boolean {
-    return userId ? this.ADMIN_IDS.includes(userId) : false;
   }
 
   async sendMessage(chatId: number, message: string): Promise<void> {

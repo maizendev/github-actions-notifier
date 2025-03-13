@@ -8,6 +8,12 @@ import {
 } from "typeorm";
 import { Repository } from "./repository.entity";
 
+export enum UserRole {
+  OWNER = "owner",
+  ADMIN = "admin",
+  USER = "user",
+}
+
 @Entity("users")
 export class User {
   @PrimaryGeneratedColumn()
@@ -19,8 +25,12 @@ export class User {
   @Column({ nullable: true })
   username: string;
 
-  @Column({ default: false })
-  isAdmin: boolean;
+  @Column({
+    type: "enum",
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
 
   @OneToMany(() => Repository, (repository) => repository.user)
   repositories: Repository[];

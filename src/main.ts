@@ -11,7 +11,13 @@ async function bootstrap() {
     configService.get("RENDER_EXTERNAL_URL") ||
     configService.get("APP_URL", "http://localhost:3000");
 
-  app.enableCors();
+  // Configure CORS
+  app.enableCors({
+    origin: [APP_URL, "https://api.telegram.org"],
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  });
 
   app.enableShutdownHooks();
 
@@ -31,33 +37,44 @@ async function bootstrap() {
     if (process.env.NODE_ENV === "production") {
       const telegramService = app.get(TelegramService);
       let retries = 3;
+      let delay = 1000; // Start with 1 second delay
+
       while (retries > 0) {
         try {
           await telegramService.setWebhook();
           console.log("Telegram webhook configured successfully");
           break;
         } catch (error) {
+          console.error(
+            `Webhook setup attempt failed (${retries} retries left):`,
+            error.message
+          );
+
           if (error?.response?.error_code === 409) {
             console.log(
               "Detected conflicting bot instance, retrying after cleanup..."
             );
             await telegramService.deleteWebhook();
-            retries--;
-            continue;
-          }
-          if (
-            error?.response?.error_code === 429 &&
-            error?.response?.parameters?.retry_after
-          ) {
-            const retryAfter = error.response.parameters.retry_after * 1000;
+          } else if (error?.response?.error_code === 429) {
+            const retryAfter =
+              error.response?.parameters?.retry_after * 1000 || delay;
             console.log(
               `Rate limited, waiting ${retryAfter}ms before retry...`
             );
             await new Promise((resolve) => setTimeout(resolve, retryAfter));
-            retries--;
+            delay *= 2; // Exponential backoff
           } else {
-            throw error;
+            console.error("Unexpected error during webhook setup:", error);
           }
+
+          retries--;
+          if (retries === 0) {
+            throw new Error(
+              "Failed to set up Telegram webhook after multiple retries"
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     }
@@ -89,4 +106,5 @@ async function bootstrap() {
     });
   });
 }
+
 bootstrap();
