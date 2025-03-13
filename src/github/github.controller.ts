@@ -115,11 +115,11 @@ export class GitHubController {
       }
 
       const { workflow_run, repository } = payload;
-      console.log("Looking for repositories:", repository.full_name);
+      const repositoryName = repository.full_name.toLowerCase();
+      console.log("Looking for repositories:", repositoryName);
 
-      const repositories = await this.repositoriesService.findByFullName(
-        repository.full_name
-      );
+      const repositories =
+        await this.repositoriesService.findByFullName(repositoryName);
 
       if (!repositories.length) {
         console.log("No matching repositories found");

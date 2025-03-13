@@ -65,8 +65,8 @@ export class SeedService implements OnModuleInit {
 
       if (!existingRepo) {
         await this.repositoryRepository.save({
-          name: repo.name,
-          fullName: repo.repository,
+          name: repo.name.toLowerCase(),
+          fullName: repo.repository.toLowerCase(),
           actions: repo.actions || [],
           webhookSecret: repo.webhookSecret,
           user: user,

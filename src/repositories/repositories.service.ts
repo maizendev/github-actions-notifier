@@ -18,8 +18,8 @@ export class RepositoriesService {
     actions: string[] = []
   ): Promise<Repository> {
     const repository = this.repositoryRepository.create({
-      name,
-      fullName,
+      name: name.toLowerCase(),
+      fullName: fullName.toLowerCase(),
       actions,
       user,
     });
@@ -36,7 +36,7 @@ export class RepositoriesService {
 
   async findByFullName(fullName: string): Promise<Repository[]> {
     return this.repositoryRepository.find({
-      where: { fullName },
+      where: { fullName: fullName.toLowerCase() },
       relations: ["user"],
     });
   }
