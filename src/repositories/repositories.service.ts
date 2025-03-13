@@ -3,7 +3,6 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository as TypeOrmRepository } from "typeorm";
 import { Repository } from "../entities/repository.entity";
 import { User } from "../entities/user.entity";
-import * as crypto from "crypto";
 
 @Injectable()
 export class RepositoriesService {
@@ -11,10 +10,6 @@ export class RepositoriesService {
     @InjectRepository(Repository)
     private readonly repositoryRepository: TypeOrmRepository<Repository>
   ) {}
-
-  private generateWebhookSecret(): string {
-    return crypto.randomBytes(32).toString("hex");
-  }
 
   async createRepository(
     user: User,
@@ -26,7 +21,6 @@ export class RepositoriesService {
       name,
       fullName,
       actions,
-      webhookSecret: this.generateWebhookSecret(),
       user,
     });
 
@@ -53,22 +47,5 @@ export class RepositoriesService {
       user: { id: userId },
     });
     return result.affected > 0;
-  }
-
-  async regenerateWebhookSecret(
-    id: number,
-    userId: number
-  ): Promise<Repository | null> {
-    const repository = await this.repositoryRepository.findOne({
-      where: { id, user: { id: userId } },
-      relations: ["user"],
-    });
-
-    if (!repository) {
-      return null;
-    }
-
-    repository.webhookSecret = this.generateWebhookSecret();
-    return this.repositoryRepository.save(repository);
   }
 }

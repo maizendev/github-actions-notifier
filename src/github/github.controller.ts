@@ -11,6 +11,7 @@ import { TelegramService } from "../telegram/telegram.service";
 import { RepositoriesService } from "../repositories/repositories.service";
 import { WorkflowStateService } from "./workflow-state.service";
 import { ThrottlerGuard } from "@nestjs/throttler";
+import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 
 interface WorkflowRunPayload {
@@ -34,7 +35,8 @@ export class GitHubController {
   constructor(
     private readonly telegramService: TelegramService,
     private readonly repositoriesService: RepositoriesService,
-    private readonly workflowStateService: WorkflowStateService
+    private readonly workflowStateService: WorkflowStateService,
+    private readonly configService: ConfigService
   ) {}
 
   private validatePayload(payload: any): payload is WorkflowRunPayload {
@@ -52,26 +54,23 @@ export class GitHubController {
     );
   }
 
-  private async verifySignature(
-    payload: any,
-    signature: string
-  ): Promise<boolean> {
+  private verifySignature(payload: any, signature: string): boolean {
     if (!signature) return false;
 
-    const repos = await this.repositoriesService.findByFullName(
-      payload.repository.full_name
+    const webhookSecret = this.configService.get<string>(
+      "GITHUB_WEBHOOK_SECRET"
     );
-    if (!repos || repos.length === 0) return false;
-
-    for (const repo of repos) {
-      const hmac = crypto.createHmac("sha256", repo.webhookSecret);
-      const digest =
-        "sha256=" + hmac.update(JSON.stringify(payload)).digest("hex");
-      if (crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))) {
-        return true;
-      }
+    if (!webhookSecret) {
+      throw new HttpException(
+        "Webhook secret not configured",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-    return false;
+
+    const hmac = crypto.createHmac("sha256", webhookSecret);
+    const digest =
+      "sha256=" + hmac.update(JSON.stringify(payload)).digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
   }
 
   private shouldProcessAction(repo: any, actionName: string): boolean {
@@ -93,7 +92,7 @@ export class GitHubController {
         );
       }
 
-      if (!(await this.verifySignature(payload, signature))) {
+      if (!this.verifySignature(payload, signature)) {
         throw new HttpException("Invalid signature", HttpStatus.UNAUTHORIZED);
       }
 

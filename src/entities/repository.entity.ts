@@ -22,9 +22,6 @@ export class Repository {
   @Column("text", { array: true, default: [] })
   actions: string[];
 
-  @Column()
-  webhookSecret: string;
-
   @ManyToOne(() => User, (user) => user.repositories)
   user: User;
 
