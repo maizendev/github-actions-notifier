@@ -123,27 +123,25 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       });
 
       // Admin commands
-      this.bot.command("watch", async (ctx) => {
+      this.bot.command("add", async (ctx) => {
         if ("text" in ctx.message) {
           const args = ctx.message.text.split(" ").slice(1);
           if (args.length > 0) {
             await this.handleWatchRepo(ctx, args[0]);
           } else {
-            await ctx.reply(
-              "Please specify repository name: /watch owner/repo"
-            );
+            await ctx.reply("Please specify repository name: /add owner/repo");
           }
         }
       });
 
-      this.bot.command("unwatch", async (ctx) => {
+      this.bot.command("remove", async (ctx) => {
         if ("text" in ctx.message) {
           const args = ctx.message.text.split(" ").slice(1);
           if (args.length > 0) {
             await this.handleUnwatchRepo(ctx, args[0]);
           } else {
             await ctx.reply(
-              "Please specify repository name: /unwatch owner/repo"
+              "Please specify repository name: /remove owner/repo"
             );
           }
         }
@@ -214,15 +212,27 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
   private async handleStart(ctx: Context) {
     const chatId = ctx.chat.id;
-    const isAdmin = this.ADMIN_IDS.includes(ctx.from?.id || 0);
+    const userId = ctx.from?.id;
+    const userRole = await this.getUserRole(userId);
 
     let message = "Hello! I'm a bot for GitHub Actions notifications.\n\n";
-    if (isAdmin) {
-      message += "Available commands:\n";
-      message += "/watch owner/repo - Start watching a repository\n";
-      message += "/unwatch owner/repo - Stop watching a repository\n";
-      message += "/list - Show list of watched repositories";
+    message += "Available commands:\n";
+
+    if (userRole === UserRole.OWNER) {
+      message += "👑 Owner commands:\n";
+      message += "/addadmin <telegram_id> - Add a new administrator\n";
+      message += "/removeadmin <telegram_id> - Remove an administrator\n\n";
     }
+
+    if (userRole === UserRole.OWNER || userRole === UserRole.ADMIN) {
+      message += "⚙️ Admin commands:\n";
+      message += "/add owner/repo - Start watching a repository\n";
+      message += "/remove owner/repo - Stop watching a repository\n";
+      message += "/list - Show list of watched repositories\n";
+    }
+
+    message += "\nℹ️ General commands:\n";
+    message += "/start - Show this help message";
 
     await ctx.reply(message);
   }

@@ -1,6 +1,6 @@
 # GitHub Actions Notifier
 
-Telegram bot that sends notifications about GitHub Actions workflow status directly to your Telegram chat.
+Telegram bot for GitHub Actions notifications.
 
 ## Features
 
@@ -80,25 +80,37 @@ npm run start:prod
 
 1. Start a chat with your bot on Telegram
 2. Use `/start` to initialize
-3. Use `/add` to add a new repository to monitor
+3. Use `/add owner/repo` to add a new repository to monitor
 4. Use `/list` to see your monitored repositories
-5. Use `/remove` to stop monitoring a repository
+5. Use `/remove owner/repo` to stop monitoring a repository
+
+## Admin Commands
+
+- `/addadmin <telegram_id>` - Add a new administrator (Owner only)
+- `/removeadmin <telegram_id>` - Remove an administrator (Owner only)
+
+## User Roles
+
+- **Owner**: Has full access to all commands
+- **Admin**: Can manage repositories
+- **User**: Basic access
 
 ## Environment Variables
 
-| Variable              | Description            | Example                              |
-| --------------------- | ---------------------- | ------------------------------------ |
-| PORT                  | Server port            | 3000                                 |
-| NODE_ENV              | Environment            | production                           |
-| APP_URL               | Your application URL   | https://your-domain.com              |
-| DB_HOST               | Database host          | localhost                            |
-| DB_PORT               | Database port          | 5432                                 |
-| DB_USERNAME           | Database username      | postgres                             |
-| DB_PASSWORD           | Database password      | your_password                        |
-| DB_DATABASE           | Database name          | github_actions_notifier              |
-| TELEGRAM_BOT_TOKEN    | Telegram Bot API token | 123456789:ABCdefGHIjklMNOpqrsTUVwxyz |
-| ADMIN_IDS             | Admin Telegram IDs     | [123456789,987654321]                |
-| GITHUB_WEBHOOK_SECRET | GitHub webhook secret  | your_secret                          |
+| Variable              | Description                  | Example                              |
+| --------------------- | ---------------------------- | ------------------------------------ |
+| PORT                  | Server port                  | 3000                                 |
+| NODE_ENV              | Environment                  | production                           |
+| APP_URL               | Your application URL         | https://your-domain.com              |
+| DB_HOST               | Database host                | localhost                            |
+| DB_PORT               | Database port                | 5432                                 |
+| DB_USERNAME           | Database username            | postgres                             |
+| DB_PASSWORD           | Database password            | your_password                        |
+| DB_DATABASE           | Database name                | github_actions_notifier              |
+| TELEGRAM_BOT_TOKEN    | Telegram Bot API token       | 123456789:ABCdefGHIjklMNOpqrsTUVwxyz |
+| ADMIN_IDS             | Admin Telegram IDs           | [123456789,987654321]                |
+| GITHUB_WEBHOOK_SECRET | GitHub webhook secret        | your_secret                          |
+| OWNER                 | Telegram ID of the bot owner | 123456789                            |
 
 ## Message Templates
 
