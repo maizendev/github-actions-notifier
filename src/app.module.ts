@@ -12,7 +12,7 @@ import { Repository } from "./entities/repository.entity";
 import { SeedService } from "./config/seed.service";
 import { UsersModule } from "./users/users.module";
 import { RepositoriesModule } from "./repositories/repositories.module";
-import { typeOrmConfig } from "./config/typeorm.config";
+import { AppDataSource } from "./config/typeorm.config";
 
 @Module({
   imports: [
@@ -27,7 +27,10 @@ import { typeOrmConfig } from "./config/typeorm.config";
       ttl: 60,
       limit: 10,
     }),
-    TypeOrmModule.forRoot(typeOrmConfig),
+    TypeOrmModule.forRoot({
+      ...AppDataSource.options,
+      autoLoadEntities: true,
+    }),
     TypeOrmModule.forFeature([User, Repository]),
     TelegramModule,
     HealthModule,

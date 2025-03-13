@@ -1,9 +1,9 @@
-import { TypeOrmModuleOptions } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { User } from "../entities/user.entity";
 import { Repository } from "../entities/repository.entity";
 import { join } from "path";
 
-export const typeOrmConfig: TypeOrmModuleOptions = {
+export const AppDataSource = new DataSource({
   type: "postgres",
   host: process.env.DB_HOST || "dpg-cv99hthu0jms73eh21j0-a",
   port: parseInt(process.env.DB_PORT, 10) || 5432,
@@ -17,4 +17,4 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   ssl: {
     rejectUnauthorized: false, // Required for Render.com PostgreSQL
   },
-};
+});
