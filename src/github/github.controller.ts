@@ -5,11 +5,12 @@ import {
   Headers,
   HttpException,
   HttpStatus,
+  UseGuards,
 } from "@nestjs/common";
 import { TelegramService } from "../telegram/telegram.service";
-import { ConfigService } from "@nestjs/config";
-import { RepositoryConfigService } from "../config/repository-config.service";
+import { RepositoriesService } from "../repositories/repositories.service";
 import { WorkflowStateService } from "./workflow-state.service";
+import { ThrottlerGuard } from "@nestjs/throttler";
 import * as crypto from "crypto";
 
 interface WorkflowRunPayload {
@@ -28,40 +29,72 @@ interface WorkflowRunPayload {
 }
 
 @Controller("github")
+@UseGuards(ThrottlerGuard)
 export class GitHubController {
   constructor(
     private readonly telegramService: TelegramService,
-    private readonly configService: ConfigService,
-    private readonly repositoryConfigService: RepositoryConfigService,
+    private readonly repositoriesService: RepositoriesService,
     private readonly workflowStateService: WorkflowStateService
-  ) {
-    // Запускаем периодическую очистку старых процессов каждый час
-    setInterval(
-      () => {
-        this.workflowStateService.cleanupOldWorkflows();
-      },
-      60 * 60 * 1000
+  ) {}
+
+  private validatePayload(payload: any): payload is WorkflowRunPayload {
+    return (
+      payload &&
+      payload.workflow_run &&
+      typeof payload.workflow_run.id === "number" &&
+      typeof payload.workflow_run.head_branch === "string" &&
+      typeof payload.workflow_run.name === "string" &&
+      typeof payload.workflow_run.status === "string" &&
+      typeof payload.workflow_run.created_at === "string" &&
+      typeof payload.workflow_run.updated_at === "string" &&
+      payload.repository &&
+      typeof payload.repository.full_name === "string"
     );
+  }
+
+  private async verifySignature(
+    payload: any,
+    signature: string
+  ): Promise<boolean> {
+    if (!signature) return false;
+
+    const repos = await this.repositoriesService.findByFullName(
+      payload.repository.full_name
+    );
+    if (!repos || repos.length === 0) return false;
+
+    for (const repo of repos) {
+      const hmac = crypto.createHmac("sha256", repo.webhookSecret);
+      const digest =
+        "sha256=" + hmac.update(JSON.stringify(payload)).digest("hex");
+      if (crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private shouldProcessAction(repo: any, actionName: string): boolean {
+    if (!repo.actions || repo.actions.length === 0) return true;
+    return repo.actions.includes(actionName);
   }
 
   @Post("webhook")
   async handleWebhook(
     @Headers("x-hub-signature-256") signature: string,
     @Headers("x-github-event") event: string,
-    @Headers("x-github-hook-id") hookId: string,
-    @Headers("x-github-delivery") delivery: string,
-    @Headers("user-agent") userAgent: string,
-    @Headers("x-github-hook-installation-target-type") targetType: string,
-    @Headers("x-github-hook-installation-target-id") targetId: string,
     @Body() payload: WorkflowRunPayload
   ) {
     try {
-      if (!this.verifySignature(payload, signature)) {
-        throw new HttpException("Invalid signature", HttpStatus.UNAUTHORIZED);
+      if (!this.validatePayload(payload)) {
+        throw new HttpException(
+          "Invalid payload format",
+          HttpStatus.BAD_REQUEST
+        );
       }
 
-      if (!userAgent?.startsWith("GitHub-Hookshot/")) {
-        throw new HttpException("Invalid User-Agent", HttpStatus.UNAUTHORIZED);
+      if (!(await this.verifySignature(payload, signature))) {
+        throw new HttpException("Invalid signature", HttpStatus.UNAUTHORIZED);
       }
 
       if (event !== "workflow_run") {
@@ -69,15 +102,17 @@ export class GitHubController {
       }
 
       const { workflow_run, repository } = payload;
-      const repositories =
-        await this.repositoryConfigService.getAllRepositories();
-      const repoConfigs = repositories.filter(
-        (repo) => repo.name.toLowerCase() === repository.full_name.toLowerCase()
+      const repositories = await this.repositoriesService.findByFullName(
+        repository.full_name
       );
 
-      if (!repoConfigs.length) return;
+      if (!repositories.length) return { status: "no matching repositories" };
 
-      for (const config of repoConfigs) {
+      for (const repo of repositories) {
+        if (!this.shouldProcessAction(repo, workflow_run.name)) {
+          continue;
+        }
+
         if (workflow_run.status === "in_progress") {
           this.workflowStateService.addWorkflow({
             id: workflow_run.id,
@@ -88,7 +123,7 @@ export class GitHubController {
           });
 
           await this.telegramService.sendActionStartNotification(
-            config.chatId,
+            parseInt(repo.user.telegramId, 10),
             repository.full_name,
             workflow_run.head_branch,
             workflow_run.name
@@ -113,7 +148,7 @@ export class GitHubController {
           }
 
           await this.telegramService.sendActionCompleteNotification(
-            config.chatId,
+            parseInt(repo.user.telegramId, 10),
             repository.full_name,
             workflow_run.head_branch,
             workflow_run.conclusion,
@@ -128,16 +163,5 @@ export class GitHubController {
       console.error("Error processing webhook:", error);
       throw error;
     }
-  }
-
-  private verifySignature(payload: any, signature: string): boolean {
-    const secret = this.configService.get<string>("GITHUB_WEBHOOK_SECRET");
-    const hmac = crypto.createHmac("sha256", secret);
-    const calculatedSignature =
-      "sha256=" + hmac.update(JSON.stringify(payload)).digest("hex");
-    return crypto.timingSafeEqual(
-      Buffer.from(signature || ""),
-      Buffer.from(calculatedSignature)
-    );
   }
 }

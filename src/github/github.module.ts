@@ -1,13 +1,12 @@
 import { Module } from "@nestjs/common";
 import { GitHubController } from "./github.controller";
 import { TelegramModule } from "../telegram/telegram.module";
-import { ConfigModule } from "@nestjs/config";
-import { RepositoryConfigService } from "../config/repository-config.service";
 import { WorkflowStateService } from "./workflow-state.service";
+import { RepositoriesModule } from "../repositories/repositories.module";
 
 @Module({
-  imports: [TelegramModule, ConfigModule],
+  imports: [TelegramModule, RepositoriesModule],
   controllers: [GitHubController],
-  providers: [RepositoryConfigService, WorkflowStateService],
+  providers: [WorkflowStateService],
 })
 export class GitHubModule {}
