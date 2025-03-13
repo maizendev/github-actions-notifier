@@ -1,18 +1,15 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Telegraf, Context } from "telegraf";
-import TelegramBot from "node-telegram-bot-api";
 import { RepositoryConfigService } from "../config/repository-config.service";
 import { UsersService } from "../users/users.service";
 import { UserRole } from "../entities/user.entity";
-import { Message } from "telegraf/typings/core/types/typegram";
 
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly OWNER_ID: number;
   private readonly ADMIN_IDS: number[];
   private readonly bot: Telegraf;
-  private readonly telegramBot: TelegramBot;
 
   constructor(
     private readonly configService: ConfigService,
@@ -39,9 +36,6 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.bot = new Telegraf(token);
-    this.telegramBot = new TelegramBot(token, {
-      polling: process.env.NODE_ENV !== "production",
-    });
   }
 
   async onModuleInit() {
@@ -464,6 +458,6 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getMe(): Promise<any> {
-    return this.telegramBot.getMe();
+    return this.bot.telegram.getMe();
   }
 }

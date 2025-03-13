@@ -7,8 +7,6 @@ import { validate } from "./config/config.validation";
 import { HealthModule } from "./health/health.module";
 import { GitHubModule } from "./github/github.module";
 import configuration from "./config/configuration";
-import { User } from "./entities/user.entity";
-import { Repository } from "./entities/repository.entity";
 import { SeedService } from "./config/seed.service";
 import { UsersModule } from "./users/users.module";
 import { RepositoriesModule } from "./repositories/repositories.module";
@@ -33,7 +31,6 @@ import { AppDataSource } from "./config/typeorm.config";
       ...AppDataSource.options,
       autoLoadEntities: true,
     }),
-    TypeOrmModule.forFeature([User, Repository]),
     TelegramModule,
     HealthModule,
     GitHubModule,
