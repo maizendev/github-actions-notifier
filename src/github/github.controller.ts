@@ -12,6 +12,7 @@ import { RepositoriesService } from "../repositories/repositories.service";
 import { WorkflowStateService } from "./workflow-state.service";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
+import { UsersService } from "../users/users.service";
 import * as crypto from "crypto";
 
 interface WorkflowRunPayload {
@@ -36,7 +37,8 @@ export class GitHubController {
     private readonly telegramService: TelegramService,
     private readonly repositoriesService: RepositoriesService,
     private readonly workflowStateService: WorkflowStateService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly usersService: UsersService
   ) {}
 
   private validatePayload(payload: any): payload is WorkflowRunPayload {
@@ -126,13 +128,9 @@ export class GitHubController {
         return { status: "no matching repositories" };
       }
 
-      console.log(
-        "Found repositories:",
-        repositories.map((r) => ({
-          name: r.name,
-          actions: r.actions,
-        }))
-      );
+      // Get all users from the database
+      const allUsers = await this.usersService.findAll();
+      console.log(`Found ${allUsers.length} users to notify`);
 
       for (const repo of repositories) {
         if (!this.shouldProcessAction(repo, workflow_run.name)) {
@@ -158,12 +156,15 @@ export class GitHubController {
             startedAt: new Date(workflow_run.created_at),
           });
 
-          await this.telegramService.sendActionStartNotification(
-            parseInt(repo.user.telegramId, 10),
-            repository.full_name,
-            workflow_run.head_branch,
-            workflow_run.name
-          );
+          // Send notification to all users
+          for (const user of allUsers) {
+            await this.telegramService.sendActionStartNotification(
+              parseInt(user.telegramId, 10),
+              repository.full_name,
+              workflow_run.head_branch,
+              workflow_run.name
+            );
+          }
         } else if (workflow_run.status === "completed") {
           console.log("Processing workflow completion:", {
             repo: repository.full_name,
@@ -189,14 +190,17 @@ export class GitHubController {
             );
           }
 
-          await this.telegramService.sendActionCompleteNotification(
-            parseInt(repo.user.telegramId, 10),
-            repository.full_name,
-            workflow_run.head_branch,
-            workflow_run.conclusion,
-            workflow_run.name,
-            executionTime
-          );
+          // Send notification to all users
+          for (const user of allUsers) {
+            await this.telegramService.sendActionCompleteNotification(
+              parseInt(user.telegramId, 10),
+              repository.full_name,
+              workflow_run.head_branch,
+              workflow_run.conclusion,
+              workflow_run.name,
+              executionTime
+            );
+          }
         }
       }
 
