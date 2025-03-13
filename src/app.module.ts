@@ -23,10 +23,12 @@ import { AppDataSource } from "./config/typeorm.config";
       cache: true,
       expandVariables: true,
     }),
-    ThrottlerModule.forRoot({
-      ttl: 60,
-      limit: 10,
-    }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60,
+        limit: 10,
+      },
+    ]),
     TypeOrmModule.forRoot({
       ...AppDataSource.options,
       autoLoadEntities: true,
