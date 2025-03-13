@@ -24,14 +24,8 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  async updateUserRole(telegramId: string, role: UserRole): Promise<User> {
-    const user = await this.findByTelegramId(telegramId);
-    if (!user) {
-      throw new Error(`User with Telegram ID ${telegramId} not found`);
-    }
-
-    user.role = role;
-    return this.userRepository.save(user);
+  async updateUserRole(telegramId: string, role: UserRole): Promise<void> {
+    await this.userRepository.update({ telegramId }, { role });
   }
 
   async findOrCreate(telegramId: string, username?: string): Promise<User> {
@@ -43,6 +37,10 @@ export class UsersService {
   }
 
   async getAllUsers(): Promise<User[]> {
+    return this.userRepository.find();
+  }
+
+  async findAll(): Promise<User[]> {
     return this.userRepository.find();
   }
 }

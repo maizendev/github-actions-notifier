@@ -8,7 +8,6 @@ import { UserRole } from "../entities/user.entity";
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly OWNER_ID: number;
-  private readonly ADMIN_IDS: number[];
   private readonly bot: Telegraf;
 
   constructor(
@@ -26,16 +25,139 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       10
     );
 
-    const adminIds = this.configService.get<string>("ADMIN_IDS");
-    try {
-      this.ADMIN_IDS = JSON.parse(adminIds);
-      console.log("Configured admin IDs:", this.ADMIN_IDS.join(", "));
-    } catch (error) {
-      console.error("Failed to parse ADMIN_IDS:", error);
-      this.ADMIN_IDS = [];
+    this.bot = new Telegraf(token);
+  }
+
+  private async getAdminIds(): Promise<number[]> {
+    const users = await this.usersService.findAll();
+    return users
+      .filter((user) => user.role === UserRole.ADMIN)
+      .map((user) => parseInt(user.telegramId, 10));
+  }
+
+  private async getUserRole(userId: number): Promise<UserRole> {
+    if (userId === this.OWNER_ID) {
+      return UserRole.OWNER;
     }
 
-    this.bot = new Telegraf(token);
+    const adminIds = await this.getAdminIds();
+    if (adminIds.includes(userId)) {
+      return UserRole.ADMIN;
+    }
+    return UserRole.USER;
+  }
+
+  private async checkPermission(
+    userId: number,
+    requiredRole: UserRole
+  ): Promise<boolean> {
+    const userRole = await this.getUserRole(userId);
+
+    switch (requiredRole) {
+      case UserRole.OWNER:
+        return userRole === UserRole.OWNER;
+      case UserRole.ADMIN:
+        return userRole === UserRole.OWNER || userRole === UserRole.ADMIN;
+      case UserRole.USER:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private async handleAddAdmin(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.OWNER))) {
+      await ctx.reply("❌ Only the owner can add administrators");
+      return;
+    }
+
+    if (!("text" in ctx.message)) {
+      await ctx.reply("❌ Invalid command format");
+      return;
+    }
+
+    const args = ctx.message.text.split(" ").slice(1);
+    if (args.length === 0) {
+      await ctx.reply("Please specify Telegram ID: /addadmin <telegram_id>");
+      return;
+    }
+
+    const newAdminId = args[0];
+    try {
+      await this.usersService.updateUserRole(newAdminId, UserRole.ADMIN);
+
+      // Notify the owner
+      await ctx.reply(`✅ User ${newAdminId} has been added as administrator`);
+
+      // Notify all admins
+      const adminMessage = `👑 New administrator added: ${newAdminId}`;
+      const adminIds = await this.getAdminIds();
+      for (const adminId of adminIds) {
+        if (adminId !== userId) {
+          // Don't notify the owner again
+          await this.sendMessage(adminId, adminMessage);
+        }
+      }
+
+      // Notify the new admin
+      await this.sendMessage(
+        parseInt(newAdminId, 10),
+        "👑 Congratulations! You have been added as an administrator.\n" +
+          "You now have access to the following commands:\n" +
+          "/add owner/repo - Start watching a repository\n" +
+          "/remove owner/repo - Stop watching a repository\n" +
+          "/list - Show list of watched repositories"
+      );
+    } catch (error) {
+      await ctx.reply(`❌ Failed to add administrator: ${error.message}`);
+    }
+  }
+
+  private async handleRemoveAdmin(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.OWNER))) {
+      await ctx.reply("❌ Only the owner can remove administrators");
+      return;
+    }
+
+    if (!("text" in ctx.message)) {
+      await ctx.reply("❌ Invalid command format");
+      return;
+    }
+
+    const args = ctx.message.text.split(" ").slice(1);
+    if (args.length === 0) {
+      await ctx.reply("Please specify Telegram ID: /removeadmin <telegram_id>");
+      return;
+    }
+
+    const adminId = args[0];
+    try {
+      await this.usersService.updateUserRole(adminId, UserRole.USER);
+
+      // Notify the owner
+      await ctx.reply(`✅ Administrator ${adminId} has been removed`);
+
+      // Notify all admins
+      const adminMessage = `👑 Administrator ${adminId} has been removed`;
+      const adminIds = await this.getAdminIds();
+      for (const adminId of adminIds) {
+        if (adminId !== userId) {
+          // Don't notify the owner again
+          await this.sendMessage(adminId, adminMessage);
+        }
+      }
+
+      // Notify the removed admin
+      await this.sendMessage(
+        parseInt(adminId, 10),
+        "👑 Your administrator privileges have been removed.\n" +
+          "You no longer have access to administrative commands."
+      );
+    } catch (error) {
+      await ctx.reply(`❌ Failed to remove administrator: ${error.message}`);
+    }
   }
 
   async onModuleInit() {
@@ -74,34 +196,6 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       if (e.message !== "Bot is not running!") {
         console.error("Error stopping Telegram bot:", e);
       }
-    }
-  }
-
-  private async getUserRole(userId: number): Promise<UserRole> {
-    if (userId === this.OWNER_ID) {
-      return UserRole.OWNER;
-    }
-    if (this.ADMIN_IDS.includes(userId)) {
-      return UserRole.ADMIN;
-    }
-    return UserRole.USER;
-  }
-
-  private async checkPermission(
-    userId: number,
-    requiredRole: UserRole
-  ): Promise<boolean> {
-    const userRole = await this.getUserRole(userId);
-
-    switch (requiredRole) {
-      case UserRole.OWNER:
-        return userRole === UserRole.OWNER;
-      case UserRole.ADMIN:
-        return userRole === UserRole.OWNER || userRole === UserRole.ADMIN;
-      case UserRole.USER:
-        return true;
-      default:
-        return false;
     }
   }
 
@@ -153,60 +247,6 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       console.error("Failed to setup bot commands:", error);
       throw error;
-    }
-  }
-
-  private async handleAddAdmin(ctx: Context) {
-    const userId = ctx.from?.id;
-    if (!(await this.checkPermission(userId, UserRole.OWNER))) {
-      await ctx.reply("❌ Only the owner can add administrators");
-      return;
-    }
-
-    if (!("text" in ctx.message)) {
-      await ctx.reply("❌ Invalid command format");
-      return;
-    }
-
-    const args = ctx.message.text.split(" ").slice(1);
-    if (args.length === 0) {
-      await ctx.reply("Please specify Telegram ID: /addadmin <telegram_id>");
-      return;
-    }
-
-    const newAdminId = args[0];
-    try {
-      await this.usersService.updateUserRole(newAdminId, UserRole.ADMIN);
-      await ctx.reply(`✅ User ${newAdminId} has been added as administrator`);
-    } catch (error) {
-      await ctx.reply(`❌ Failed to add administrator: ${error.message}`);
-    }
-  }
-
-  private async handleRemoveAdmin(ctx: Context) {
-    const userId = ctx.from?.id;
-    if (!(await this.checkPermission(userId, UserRole.OWNER))) {
-      await ctx.reply("❌ Only the owner can remove administrators");
-      return;
-    }
-
-    if (!("text" in ctx.message)) {
-      await ctx.reply("❌ Invalid command format");
-      return;
-    }
-
-    const args = ctx.message.text.split(" ").slice(1);
-    if (args.length === 0) {
-      await ctx.reply("Please specify Telegram ID: /removeadmin <telegram_id>");
-      return;
-    }
-
-    const adminId = args[0];
-    try {
-      await this.usersService.updateUserRole(adminId, UserRole.USER);
-      await ctx.reply(`✅ Administrator ${adminId} has been removed`);
-    } catch (error) {
-      await ctx.reply(`❌ Failed to remove administrator: ${error.message}`);
     }
   }
 
