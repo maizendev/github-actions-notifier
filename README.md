@@ -6,7 +6,7 @@ Telegram bot for GitHub Actions notifications.
 
 - 🔔 Real-time notifications for GitHub Actions workflow status
 - 👥 Multi-user support - multiple users can monitor the same repository
-- 🔐 Secure webhook handling with per-repository secrets
+- 🔐 Secure webhook handling with global secret
 - ⚡ Instant notifications for workflow start and completion
 - ⏱️ Execution time tracking for workflows
 - 🎯 Filter notifications by specific actions (optional)
@@ -44,14 +44,30 @@ cp .env.example .env
 4. Configure your environment variables in `.env`:
 
 ```env
-# Required configurations
+# Server Configuration
+PORT=3000
+NODE_ENV=production
+APP_URL=https://your-domain.com
+
+# Database Configuration
 DB_HOST=your_db_host
+DB_PORT=5432
 DB_USERNAME=your_db_username
 DB_PASSWORD=your_db_password
 DB_DATABASE=your_db_name
+
+# Telegram Configuration
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-ADMIN_IDS=[your_telegram_id] # Array of admin Telegram IDs
+OWNER=your_telegram_id # Telegram ID of the bot owner
+ADMIN_IDS=[telegram_id1,telegram_id2] # Array of admin Telegram IDs
+
+# GitHub Configuration
 GITHUB_WEBHOOK_SECRET=your_github_webhook_secret
+
+# Message Templates
+TELEGRAM_SUCCESS_EMOJI=✅
+TELEGRAM_ERROR_EMOJI=❌
+TELEGRAM_MESSAGE_TEMPLATE="{emoji} GitHub Action '{action}' завершен {status}!\nRepository: {repository}\nBranch: {branch}"
 ```
 
 5. Run database migrations:
@@ -108,9 +124,9 @@ npm run start:prod
 | DB_PASSWORD           | Database password            | your_password                        |
 | DB_DATABASE           | Database name                | github_actions_notifier              |
 | TELEGRAM_BOT_TOKEN    | Telegram Bot API token       | 123456789:ABCdefGHIjklMNOpqrsTUVwxyz |
+| OWNER                 | Telegram ID of the bot owner | 123456789                            |
 | ADMIN_IDS             | Admin Telegram IDs           | [123456789,987654321]                |
 | GITHUB_WEBHOOK_SECRET | GitHub webhook secret        | your_secret                          |
-| OWNER                 | Telegram ID of the bot owner | 123456789                            |
 
 ## Message Templates
 
