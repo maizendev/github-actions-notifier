@@ -160,6 +160,40 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async handleUserList(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!(await this.checkPermission(userId, UserRole.ADMIN))) {
+      await ctx.reply("❌ Only administrators can view the user list");
+      return;
+    }
+
+    try {
+      const users = await this.usersService.findAll();
+
+      if (users.length === 0) {
+        await ctx.reply("No users found in the system.");
+        return;
+      }
+
+      const message = users
+        .map((user) => {
+          const roleEmoji =
+            user.role === UserRole.OWNER
+              ? "👑"
+              : user.role === UserRole.ADMIN
+                ? "⚙️"
+                : "👤";
+          return `${roleEmoji} ID: ${user.telegramId}\n   Username: ${user.username || "Not set"}\n   Role: ${user.role}\n   Joined: ${user.createdAt.toLocaleDateString()}`;
+        })
+        .join("\n\n");
+
+      await ctx.reply("📋 User List:\n\n" + message);
+    } catch (error) {
+      console.error(`Error in handleUserList for chat ${ctx.chat.id}:`, error);
+      await ctx.reply(`❌ Error: ${error.message}`);
+    }
+  }
+
   async onModuleInit() {
     try {
       if (process.env.NODE_ENV === "production") {
@@ -213,6 +247,12 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       this.bot.command("removeadmin", async (ctx) => {
         if ("text" in ctx.message) {
           await this.handleRemoveAdmin(ctx);
+        }
+      });
+
+      this.bot.command("userlist", async (ctx) => {
+        if ("text" in ctx.message) {
+          await this.handleUserList(ctx);
         }
       });
 

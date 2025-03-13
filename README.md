@@ -104,6 +104,7 @@ npm run start:prod
 
 - `/addadmin <telegram_id>` - Add a new administrator (Owner only)
 - `/removeadmin <telegram_id>` - Remove an administrator (Owner only)
+- `/userlist` - Show list of all users with their roles (Admin only)
 
 ## User Roles
 
