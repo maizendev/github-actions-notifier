@@ -67,9 +67,9 @@ export class GitHubController {
       );
     }
 
+    const rawPayload = JSON.stringify(payload);
     const hmac = crypto.createHmac("sha256", webhookSecret);
-    const digest =
-      "sha256=" + hmac.update(JSON.stringify(payload)).digest("hex");
+    const digest = "sha256=" + hmac.update(rawPayload).digest("hex");
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
   }
 
@@ -85,7 +85,16 @@ export class GitHubController {
     @Body() payload: WorkflowRunPayload
   ) {
     try {
+      console.log("Received webhook:", {
+        event,
+        signature: signature ? "present" : "missing",
+        repository: payload?.repository?.full_name,
+        workflow: payload?.workflow_run?.name,
+        status: payload?.workflow_run?.status,
+      });
+
       if (!this.validatePayload(payload)) {
+        console.error("Invalid payload format:", payload);
         throw new HttpException(
           "Invalid payload format",
           HttpStatus.BAD_REQUEST
@@ -93,26 +102,54 @@ export class GitHubController {
       }
 
       if (!this.verifySignature(payload, signature)) {
+        console.error("Invalid signature:", {
+          received: signature,
+          expected: this.generateExpectedSignature(payload),
+        });
         throw new HttpException("Invalid signature", HttpStatus.UNAUTHORIZED);
       }
 
       if (event !== "workflow_run") {
+        console.log("Ignoring non-workflow event:", event);
         return { status: "ignored", event };
       }
 
       const { workflow_run, repository } = payload;
+      console.log("Looking for repositories:", repository.full_name);
+
       const repositories = await this.repositoriesService.findByFullName(
         repository.full_name
       );
 
-      if (!repositories.length) return { status: "no matching repositories" };
+      if (!repositories.length) {
+        console.log("No matching repositories found");
+        return { status: "no matching repositories" };
+      }
+
+      console.log(
+        "Found repositories:",
+        repositories.map((r) => ({
+          name: r.name,
+          actions: r.actions,
+        }))
+      );
 
       for (const repo of repositories) {
         if (!this.shouldProcessAction(repo, workflow_run.name)) {
+          console.log("Skipping action:", {
+            repo: repo.name,
+            action: workflow_run.name,
+          });
           continue;
         }
 
         if (workflow_run.status === "in_progress") {
+          console.log("Processing workflow start:", {
+            repo: repository.full_name,
+            action: workflow_run.name,
+            branch: workflow_run.head_branch,
+          });
+
           this.workflowStateService.addWorkflow({
             id: workflow_run.id,
             name: workflow_run.name,
@@ -128,6 +165,12 @@ export class GitHubController {
             workflow_run.name
           );
         } else if (workflow_run.status === "completed") {
+          console.log("Processing workflow completion:", {
+            repo: repository.full_name,
+            action: workflow_run.name,
+            conclusion: workflow_run.conclusion,
+          });
+
           const workflow = this.workflowStateService.getWorkflow(
             workflow_run.id,
             repository.full_name
@@ -157,10 +200,20 @@ export class GitHubController {
         }
       }
 
+      console.log("Webhook processed successfully");
       return { status: "success" };
     } catch (error) {
       console.error("Error processing webhook:", error);
       throw error;
     }
+  }
+
+  private generateExpectedSignature(payload: any): string {
+    const webhookSecret = this.configService.get<string>(
+      "GITHUB_WEBHOOK_SECRET"
+    );
+    const rawPayload = JSON.stringify(payload);
+    const hmac = crypto.createHmac("sha256", webhookSecret);
+    return "sha256=" + hmac.update(rawPayload).digest("hex");
   }
 }
