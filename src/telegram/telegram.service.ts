@@ -309,6 +309,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       message += "/add owner/repo - Start watching a repository\n";
       message += "/remove owner/repo - Stop watching a repository\n";
       message += "/list - Show list of watched repositories\n";
+      message += "/userlist - Show list of all users with their roles\n";
     }
 
     message += "\nℹ️ General commands:\n";
